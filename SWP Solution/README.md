@@ -6,7 +6,7 @@ Song 等人于 2000 年提出了第一个实用的可搜索加密方案 SWP。�
 
 ### Flow Chart
 
-[![szsn5n.png](README.assets/szsn5n.png)](https://imgchr.com/i/szsn5n)
+[![szRSUg.png](https://s3.ax1x.com/2021/01/27/szRSUg.png)](https://imgchr.com/i/szRSUg)
 
 ### Preparation
 
