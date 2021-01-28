@@ -71,10 +71,11 @@ Song 等人于 2000 年提出了第一个实用的可搜索加密方案 SWP。�
 
 ```json
 {
-    "type":"upload/query",
+    "type":"upload/query/test",
     "filename":"filename",
     "content":"....",//用空格分词
-    "query":"....."//(x,k)
+    "query":".....",//(x,k)
+    "test":1+2//使用eval()检验
 }
 ```
 
@@ -83,14 +84,18 @@ Song 等人于 2000 年提出了第一个实用的可搜索加密方案 SWP。�
 ```json
 {
     "type":"response",
-    "status":"SUCCESS/FAILED",
+    "status":200/500,//对于Upload/Query请求的response只回传这一个字段和type
     "filename":"",//用空格分词
     "index":"",//non-0 style
-    "content":""//用空格分词
+    "content":"",//用空格分词
+    "result":200//测试连接用
 }
 ```
 
 ### Operation Process
+### Preparation
+1. 初始化`connection`类
+2. 
 #### 生成密文
 1. 生成随机五字母单词列表
 1. 如果没有读到key（文件存储），则生成**两个**key，使用`Fernet.generate_key()`,key是b格式串。（Tips：由于生物特征模糊提取器转化的是一个具有高度随机性的串，所以不需要对密码加盐之后键控哈希），并保存
@@ -136,7 +141,7 @@ Song 等人于 2000 年提出了第一个实用的可搜索加密方案 SWP。�
 8. XOR:`fin=p xor enc`
 
 9. Upload`fin`
-#### Query:Local
+#### Query: Local
 1. 输入关键词
 
 2. 使用密钥k''和对称加密算法加密关键词w->X
@@ -147,7 +152,7 @@ Song 等人于 2000 年提出了第一个实用的可搜索加密方案 SWP。�
 
 5. Send(X,k)
 
-#### Query:Remote
+#### Query: Remote
 
 对于每个文件C的每个词W:
 
@@ -168,3 +173,142 @@ Song 等人于 2000 年提出了第一个实用的可搜索加密方案 SWP。�
 5. Tp=(Si,F(Si,K))
 6. Xp=Cp XOR Tp
 7. Wp=Decrypt(Xp),这里是之前的对称算法的解密操作,使用k''作为密钥.
+
+## Tech Notes
+
+Technical skills acquired during the development.
+
+### Json的读取和写入
+
+考虑将配置写在`config.json`中,以及网络传参使用json.
+
+Ref: [6.2 读写JSON数据 — python3-cookbook 3.0.0 文档 (python3-cookbook.readthedocs.io)](https://python3-cookbook.readthedocs.io/zh_CN/latest/c06/p02_read-write_json_data.html)
+
+```python
+# Writing JSON data
+with open('data.json', 'w') as f:
+    json.dump(data, f)
+
+# Reading data back
+with open('data.json', 'r') as f:
+    data = json.load(f)
+```
+
+
+
+
+
+### Network
+
+本Demo设计了一个客户端和一个服务端。
+
+演示时暂定为都在`127.0.0.1`上运行.
+
+#### 创建Socket和连接
+
+```python
+# 导入socket库:
+import socket
+
+# 创建一个socket:
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)#AF_INET指定使用IPv4协议，如果要用更先进的IPv6，就指定为AF_INET6。SOCK_STREAM指定使用面向流的TCP协议
+# 建立连接:
+s.connect(('www.sina.com.cn', 80))
+```
+
+#### 设计过程
+
+1. Send
+2. Response(Response json 或者status code)
+
+### 编码和解码
+
+项目中大范围使用了`byte`类型和`string`类型.
+
+通用的转换方式:
+
+```python
+s1 = str(b, encoding='utf-8')#Byte to Str
+b =  bytes(s1, encoding='utf-8')# Str to Byte
+```
+### 测试连接
+使用`send()`方法发送一个模拟json报文。如果正常返回输出结果。？
+### pprint
+就像这样：
+```python
+pp = pprint.PrettyPrinter(indent=4,width=41, compact=True)
+pp.pprint("SMP Demo")
+```
+### 快速实现菜单栏
+示例代码
+```python
+#!/usr/bin/env python
+# _*_ coding:utf-8 _*_
+
+import time
+import sys
+
+
+class Things():
+    def __init__(self, username='nobody'):
+        self.username = username
+
+    def clean_disk(self):
+        print("cleaning disk ... ...")
+        time.sleep(1)
+        print("clean disk done!")
+
+    def clean_dir1(self):
+        print("cleaning dir1 ... ...")
+        time.sleep(1)
+        print("clean dir1 done!")
+
+    def clean_dir2(self):
+        print("cleaning dir2 ... ...")
+        time.sleep(1)
+        print("clean dir2 done!")
+
+
+class Menu():
+    def __init__(self):
+        self.thing = Things()
+        self.choices = {
+            "1": self.thing.clean_disk,
+            "2": self.thing.clean_dir1,
+            "3": self.thing.clean_dir2,
+            "4": self.quit
+        }
+
+    def display_menu(self):
+        print("""
+Operation Menu:
+1. Clean disk
+2. Clean dir1
+3. Clean dir2
+4. Quit
+""")
+
+    def run(self):
+        while True:
+            self.display_menu()
+            try:
+                choice = input("Enter an option: ")
+            except Exception as e:
+                print("Please input a valid option!")continue
+
+            choice = str(choice).strip()
+            action = self.choices.get(choice)#在self.choice中查找对应的方法
+            if action:
+                action()
+            else:
+                print("{0} is not a valid choice".format(choice))
+
+    def quit(self):
+        print("\nThank you for using this script!\n")
+        sys.exit(0)
+
+
+if __name__ == '__main__':
+    Menu().run()
+```
+Via https://blog.csdn.net/u012904337/article/details/79504319
