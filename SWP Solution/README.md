@@ -88,14 +88,11 @@ Song 等人于 2000 年提出了第一个实用的可搜索加密方案 SWP。�
     "filename":"",//用空格分词
     "index":"",//non-0 style
     "content":"",//用空格分词
-    "result":200//测试连接用
+    "result":3//测试连接用
 }
 ```
 
 ### Operation Process
-### Preparation
-1. 初始化`connection`类
-2. 
 #### 生成密文
 1. 生成随机五字母单词列表
 1. 如果没有读到key（文件存储），则生成**两个**key，使用`Fernet.generate_key()`,key是b格式串。（Tips：由于生物特征模糊提取器转化的是一个具有高度随机性的串，所以不需要对密码加盐之后键控哈希），并保存
@@ -174,6 +171,11 @@ Song 等人于 2000 年提出了第一个实用的可搜索加密方案 SWP。�
 6. Xp=Cp XOR Tp
 7. Wp=Decrypt(Xp),这里是之前的对称算法的解密操作,使用k''作为密钥.
 
+### 生成key
+
+1. 用户有随机密钥k',k‘’，均使用`Fernet.generate_key()`
+2. 还需要一个Seed用于产生随机流S。seed参考格式生成。
+
 ## Tech Notes
 
 Technical skills acquired during the development.
@@ -219,7 +221,7 @@ s.connect(('www.sina.com.cn', 80))
 #### 设计过程
 
 1. Send
-2. Response(Response json 或者status code)
+2. Response(Response json)
 
 ### 编码和解码
 
@@ -312,3 +314,34 @@ if __name__ == '__main__':
     Menu().run()
 ```
 Via https://blog.csdn.net/u012904337/article/details/79504319
+### 生成无重复的随机串
+单词空间26^5，选择5000个...应该可以吧(心虚)
+```python
+import random
+import string
+file = open('1.txt','w')
+for i in range(1000000):    
+    random_str = ''.join(random.sample(string.digits *5 +string.ascii_letters*4,255))                 
+    file.write(random_str + '\n')
+file.close()
+
+```
+`string.ascii_lowercase`:小写
+`string.ascii_letters`:大写+小写
+Via https://blog.csdn.net/heybob/article/details/45341241
+
+### Standard Logging Config 
+```python
+import logging as log
+log.basicConfig(level="DEBUG",format="%(asctime)s-[%(levelname)s]:%(message)s")
+```
+日志中添加上下文变量
+要记录变量的数据，可以使用一个格式串来格式化输出，并将变量作为参数传递给日志记录函数。
+```python
+logging.info("%d plus %d",num1,num2)
+```
+## TODO
+1. log system
+2. Events
+
+## 
