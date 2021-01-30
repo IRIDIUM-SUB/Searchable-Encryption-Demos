@@ -1,7 +1,7 @@
 '''
 Author: I-Hsien
 Date: 2021-01-28 20:02:50
-LastEditTime: 2021-01-29 21:24:25
+LastEditTime: 2021-01-30 22:23:45
 LastEditors: I-Hsien
 Description: Client Program
 FilePath: \Searchable-Encryption-Demos\SWP Solution\local.py
@@ -13,11 +13,7 @@ import os
 import random
 import string
 import Log as log
-FUNCTIONS = ['Test Connection']
-if __name__ == "__main__":
 
-    menu = Menu()
-    menu.run()
 
 
 class Menu(object):
@@ -27,10 +23,11 @@ class Menu(object):
 
     def __init__(self):
         self.pp = pprint.PrettyPrinter(indent=4, width=41, compact=True)
+        self.client=ClientTransactionInterface()
         self.choices = {
-            "1": self.Events.connection_test,
-            "3": self.Events.gen_wordlist,
-            "2": self.thing.clean_dir2,
+            "1": self.client.connection_test,
+            "3": self.client.gen_wordlist,
+            "2": "",
             "0": self.quit
         }
 
@@ -61,6 +58,7 @@ class Menu(object):
                 log.log.INFO("Got Command %s", action)
                 action()
             else:
+                log.log.error("Invaild Choice")
                 print("{0} is not a valid choice".format(choice))
 
     def quit(self):
@@ -69,7 +67,7 @@ class Menu(object):
         os._exit()  # Exit Now
 
 
-class Events(object):
+class ClientTransactionInterface(object):
     '''
     事务处理接口
     '''
@@ -110,7 +108,7 @@ class Events(object):
         log.log.info("Starting Generate wordlist")
         for i in range(FILES_AMOUNT):
             Filename = str(i+1)+".txt"
-            with open(Filename,"w")as f:
+            with open(Filename, "w")as f:
                 WordList = []
                 for _ in range(WORDS_PER_FILE):
                     RandomStr = ''.join(random.sample(
@@ -123,3 +121,10 @@ class Events(object):
                 log.log.info("File %d written", i+1)
 
         return
+    
+    
+    
+if __name__ == "__main__":
+
+    menu = Menu()
+    menu.run()

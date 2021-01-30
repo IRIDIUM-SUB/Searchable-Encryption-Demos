@@ -1,7 +1,7 @@
 '''
 Author: I-Hsien
 Date: 2021-01-27 21:41:45
-LastEditTime: 2021-01-29 21:12:01
+LastEditTime: 2021-01-30 22:08:41
 LastEditors: I-Hsien
 Description: Network Connection for the Demo
 FilePath: \Searchable-Encryption-Demos\SWP Solution\network.py
@@ -13,7 +13,7 @@ import socket
 import json
 import time
 import Log as log
-CONFIG_FILE = "./config.json"
+CONFIG_FILE = "config.json"
 
 
 class connection(object):
@@ -25,13 +25,13 @@ class connection(object):
         # Read Config
         with open(CONFIG_FILE, "r")as f:
             self.conf = json.load(f)
+            f.close()
 
-    def send(self, data: dict) -> Bool:
+    def send(self, data: dict) -> bool:
         '''
         description: Send request json to the server
         param {data:dict}
         return {status:Bool}
-
         '''
         log.log.info("Starting sending data")
 

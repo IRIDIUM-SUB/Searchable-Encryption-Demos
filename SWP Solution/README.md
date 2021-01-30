@@ -217,7 +217,7 @@ s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)#AF_INET指定使用IPv4协
 # 建立连接:
 s.connect(('www.sina.com.cn', 80))
 ```
-
+### Server
 #### 设计过程
 
 1. Send
@@ -344,4 +344,4 @@ logging.info("%d plus %d",num1,num2)
 1. log system
 2. Events
 
-## 
+

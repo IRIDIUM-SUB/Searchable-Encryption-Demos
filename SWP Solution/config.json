@@ -1,6 +1,6 @@
 {
     "LocalIP":"127.0.0.1",
-    "RemoteIP":"217.0.0.1",
+    "RemoteIP":"127.0.0.1",
     "LocalPort":2020,
     "RemotePort":2021
 
