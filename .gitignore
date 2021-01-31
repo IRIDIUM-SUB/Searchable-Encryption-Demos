@@ -129,4 +129,7 @@ dmypy.json
 # Pyre type checker
 .pyre/
 # Extra Files
-lab.py
+lab*.py
+# Data Files
+?.txt
+10.txt

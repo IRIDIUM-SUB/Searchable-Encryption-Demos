@@ -1,7 +1,7 @@
 '''
 Author: I-Hsien
 Date: 2021-01-27 21:55:57
-LastEditTime: 2021-01-30 22:24:09
+LastEditTime: 2021-01-31 20:14:45
 LastEditors: I-Hsien
 Description: Another Isolated Program, act as server.
 FilePath: \Searchable-Encryption-Demos\SWP Solution\Server.py
@@ -14,22 +14,6 @@ import Log as log
 import threading
 CONFIG_FILE = "config.json"
 
-if __name__ == "__main__":
-    with open(CONFIG_FILE, "r")as f:
-        NetConf = json.load(f)
-        f.close()
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind((NetConf["RemoteIP"], NetConf["RemotePort"]))  # Bind port
-    log.log.debug("Bind port,%s:%d",NetConf["RemoteIP"], NetConf["RemotePort"])
-    s.listen(5)  # Maxium Connections
-    log.log.info('Waiting for connection...')
-    while True:
-        # 接受一个新连接:
-        sock, addr = s.accept()
-        # 创建新线程来处理TCP连接:
-        t = threading.Thread(target=tcplink, args=(sock, addr))
-        t.start()
-
 
 def tcplink(sock, addr) -> None:
     '''
@@ -39,18 +23,23 @@ def tcplink(sock, addr) -> None:
     '''
     log.log.info('Accept new connection from %s:%s...',
                  str(addr[0]), str(addr[1]))
-    rcvdatabin = ""
-    while True:
-        rcvdatabin += sock.recv(1024)
+    rcvdatabin = b""
+
+    while True:#Main loop,事务处理应该在这里面。
+        log.log.debug("TCP Loop...")
+        rcvdatabin = sock.recv(1024)
+
         time.sleep(1)
+        log.log.debug("Data Segment:%s", rcvdatabin.decode('utf-8'))
         if not rcvdatabin:
             log.log.warning("Connection Loop broken")
-            break  # Stop receiving'
-    rcvdata = rcvdatabin.decode('utf-8')
-    log.log.debug("received data:%s", rcvdata)
+            break  # Stop receiving
+        rcvdata = rcvdatabin.decode('utf-8')
+        log.log.debug("received data:%s", rcvdata)
 
-    ServerTransactionInterface(sock, json.loads(rcvdata))  # 传入事务处理接口
-    sock.close()
+        ServerTransactionInterface(sock, json.loads(rcvdata))  # 传入事务处理接口
+    
+    sock.close()#Close Connection
     log.log.warning('Connection from %s closed.', addr)
     return
 
@@ -85,7 +74,7 @@ def ServerTransactionInterface(sock, data: dict) -> None:
     choice = str(choice).strip()
     action = choices.get(choice)  # choice中查找对应的方法
     if action:
-        log.log.INFO("Got Command %s", action)
+        log.log.info("Got Command %s", action)
         action(sock, data)
     else:
         log.log.error("{0} is not a valid choice".format(choice))
@@ -128,3 +117,21 @@ def TestConnection(sock, data) -> int:
     sock.send(ResopnseJson.encode(encoding="utf-8"))
     log.log.info("Response mseg sent,type:%s", data['type'])
     return
+
+
+if __name__ == "__main__":
+    with open(CONFIG_FILE, "r")as f:
+        NetConf = json.load(f)
+        f.close()
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind((NetConf["RemoteIP"], NetConf["RemotePort"]))  # Bind port
+    log.log.debug("Bind port,%s:%d",
+                  NetConf["RemoteIP"], NetConf["RemotePort"])
+    s.listen(5)  # Maxium Connections
+    log.log.info('Waiting for connection...')
+    while True:
+        # 接受一个新连接:
+        sock, addr = s.accept()
+        # 创建新线程来处理TCP连接:
+        t = threading.Thread(target=tcplink, args=(sock, addr))
+        t.start()

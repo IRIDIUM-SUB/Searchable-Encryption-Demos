@@ -1,7 +1,7 @@
 '''
 Author: I-Hsien
 Date: 2021-01-27 21:41:45
-LastEditTime: 2021-01-30 22:08:41
+LastEditTime: 2021-01-31 19:52:28
 LastEditors: I-Hsien
 Description: Network Connection for the Demo
 FilePath: \Searchable-Encryption-Demos\SWP Solution\network.py
@@ -45,33 +45,21 @@ class connection(object):
         log.log.info("connection estbalished")
 
         s.send(bytes(sendstr, encoding='utf-8'))
+        
         log.log.info("data sent")
         # 接收数据:
-        buffer = []
-        StartTime = time.time()
-
-        log.log.debug("Starting waiting %s", StartTime)
-
-        while time.time()-StartTime < 50:  # Overtime Check, 50 Secs Maximum
-            # 每次最多接收512字节:
-            d = s.recv(512)
-            if d:
-                buffer.append(d)
-                log.log.debug("received data:%s", d)
-            else:
-                log.log.debug("No more data")
-                break
-        rcvdatabin = b''.join(buffer)
+        #NOTE:只收一次
+        
+        rcvdatabin = s.recv(1024)#1024 Bytes per most
+        log.log.debug("received data:%s", rcvdatabin)
         rcvdata = str(rcvdatabin, encoding='utf-8')# Decode
         rcvdict = json.loads(rcvdata)  # json string to dict
+        
         # 关闭连接:
         s.close()
         log.log.debug("Stop Connection")
         if rcvdict["status"] == 200:
             return rcvdict
-        elif time.time()-StartTime > 50:
-            log.log.error("Connection failed due to timeout")
-            return False
         else:
             log.log.error("Connection failed due to connection failed")
             return False

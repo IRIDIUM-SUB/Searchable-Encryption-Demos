@@ -217,6 +217,22 @@ s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)#AF_INET指定使用IPv4协
 # 建立连接:
 s.connect(('www.sina.com.cn', 80))
 ```
+#### Tips
+发送和接收要对应，否则会出现两个都在监听的情况。
+修改为一次收-一次发模式。
+问题出在server上。调整逻辑。应该是loop的问题。
+```python
+while True:
+        if not dataseg :
+            log.log.warning("Connection Loop broken")
+            break  # Stop receiving
+        log.log.debug("TCP Loop...")
+        dataseg=sock.recv(1024)
+        rcvdatabin = rcvdatabin+dataseg
+        time.sleep(1)
+        log.log.debug("Data Segment:%s",dataseg.decode('utf-8'))
+```
+事务处理应该在这个mainloop里面,否则会卡接收。1024字节**或许**已经足够。
 ### Server
 #### 设计过程
 
@@ -340,8 +356,6 @@ log.basicConfig(level="DEBUG",format="%(asctime)s-[%(levelname)s]:%(message)s")
 ```python
 logging.info("%d plus %d",num1,num2)
 ```
-## TODO
-1. log system
-2. Events
+==不能使用`INFO`,会报 not callable.
 
-
+## Test Notes

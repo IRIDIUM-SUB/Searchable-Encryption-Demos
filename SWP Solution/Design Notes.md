@@ -1,7 +1,7 @@
 <!--
  * @Author: I-Hsien
  * @Date: 2021-01-28 21:41:22
- * @LastEditTime: 2021-01-29 17:50:27
+ * @LastEditTime: 2021-01-31 16:56:24
  * @LastEditors: I-Hsien
  * @Description: 流程设计；不涉及具体实现
  * @FilePath: \Searchable-Encryption-Demos\SWP Solution\Design Notes.md
@@ -16,4 +16,5 @@
 3. Act
 ## Server(Remote)
 Keep listening port:
-
+If received json data:
+分发事务
