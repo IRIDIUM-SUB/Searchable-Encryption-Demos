@@ -1,7 +1,7 @@
 '''
 Author: I-Hsien
 Date: 2021-01-28 20:02:50
-LastEditTime: 2021-01-31 20:18:31
+LastEditTime: 2021-01-31 20:36:02
 LastEditors: I-Hsien
 Description: Client Program
 FilePath: \Searchable-Encryption-Demos\SWP Solution\local.py
@@ -23,6 +23,7 @@ class Menu(object):
     def __init__(self):
         self.pp = pprint.PrettyPrinter(indent=4, width=41, compact=True)
         self.client = ClientTransactionInterface()
+
         self.choices = {
             "1": self.client.connection_test,
             "3": self.client.gen_wordlist,
@@ -30,7 +31,7 @@ class Menu(object):
             "0": self.quit
         }
 
-    def display_menu(self):
+    def display_menu(self)->None:
         self.pp.pprint("SMP Demo")
         self.pp.pprint("1. Connection Test")
         self.pp.pprint("2. Generate Key")
@@ -40,6 +41,7 @@ class Menu(object):
         self.pp.pprint("0. Exit")
         self.pp.pprint("-----------------------")
         log.log.debug("Menu displayed")
+        return
 
     def run(self):
         while True:  # Main Loop
@@ -91,7 +93,9 @@ class ClientTransactionInterface(object):
         num2 = random.randint(0, 1000)
         data["test"] = str(num1)+"+"+str(num2)
         log.log.info("Ready to send %d and %d", num1, num2)
+            
         rcvdict = self.connection.send(data)
+        
         if rcvdict['result'] == num1+num2:
             print("Ping Success")
             log.log.info("Ping Success,%d plus %d = %d",
@@ -106,6 +110,7 @@ class ClientTransactionInterface(object):
         文件名为1,2,3,4,5
         '''
         log.log.info("Starting Generating wordlist")
+        
         for i in range(FILES_AMOUNT):
             Filename = str(i+1)+".txt"
             with open(Filename, "w")as f:
@@ -119,7 +124,6 @@ class ClientTransactionInterface(object):
                 f.write(",".join(WordList))
                 f.close()
                 log.log.info("File %d written", i+1)
-
         return
 
 
