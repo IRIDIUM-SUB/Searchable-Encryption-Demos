@@ -1,7 +1,7 @@
 '''
 Author: I-Hsien
 Date: 2021-01-27 21:41:45
-LastEditTime: 2021-01-31 19:52:28
+LastEditTime: 2021-02-06 19:58:56
 LastEditors: I-Hsien
 Description: Network Connection for the Demo
 FilePath: \Searchable-Encryption-Demos\SWP Solution\network.py
@@ -41,15 +41,10 @@ class connection(object):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # 建立连接:
         s.connect((self.conf["RemoteIP"], self.conf["RemotePort"]))
-
         log.log.info("connection estbalished")
-
         s.send(bytes(sendstr, encoding='utf-8'))
-        
         log.log.info("data sent")
         # 接收数据:
-        #NOTE:只收一次
-        
         rcvdatabin = s.recv(1024)#1024 Bytes per most
         log.log.debug("received data:%s", rcvdatabin)
         rcvdata = str(rcvdatabin, encoding='utf-8')# Decode

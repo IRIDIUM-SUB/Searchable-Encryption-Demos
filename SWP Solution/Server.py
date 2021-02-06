@@ -1,7 +1,7 @@
 '''
 Author: I-Hsien
 Date: 2021-01-27 21:55:57
-LastEditTime: 2021-01-31 20:14:45
+LastEditTime: 2021-02-03 10:59:20
 LastEditors: I-Hsien
 Description: Another Isolated Program, act as server.
 FilePath: \Searchable-Encryption-Demos\SWP Solution\Server.py
@@ -77,7 +77,7 @@ def ServerTransactionInterface(sock, data: dict) -> None:
         log.log.info("Got Command %s", action)
         action(sock, data)
     else:
-        log.log.error("{0} is not a valid choice".format(choice))
+        log.log.error("{0} is not a valid choice",format(choice))
         return
 
 

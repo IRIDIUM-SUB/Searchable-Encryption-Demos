@@ -132,4 +132,5 @@ dmypy.json
 lab*.py
 # Data Files
 ?.txt
-10.txt
+*.bin
+??.txt

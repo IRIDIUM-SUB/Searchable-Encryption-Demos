@@ -1,7 +1,7 @@
 '''
 Author: I-Hsien
 Date: 2021-01-28 20:02:50
-LastEditTime: 2021-01-31 20:36:02
+LastEditTime: 2021-02-06 20:50:17
 LastEditors: I-Hsien
 Description: Client Program
 FilePath: \Searchable-Encryption-Demos\SWP Solution\local.py
@@ -10,9 +10,12 @@ Comments: None
 import network
 import pprint
 import os
+import sys
 import random
 import string
 import Log as log
+import secrets
+from cryptography.fernet import Fernet
 
 
 class Menu(object):
@@ -27,11 +30,11 @@ class Menu(object):
         self.choices = {
             "1": self.client.connection_test,
             "3": self.client.gen_wordlist,
-            "2": "",
+            "2": self.client.gen_key,
             "0": self.quit
         }
 
-    def display_menu(self)->None:
+    def display_menu(self) -> None:
         self.pp.pprint("SMP Demo")
         self.pp.pprint("1. Connection Test")
         self.pp.pprint("2. Generate Key")
@@ -66,7 +69,7 @@ class Menu(object):
     def quit(self):
         print("\nThank you for using this script!\n")
         log.log.info("Exit")
-        os._exit()  # Exit Now
+        sys.exit() # Exit Now
 
 
 class ClientTransactionInterface(object):
@@ -93,9 +96,9 @@ class ClientTransactionInterface(object):
         num2 = random.randint(0, 1000)
         data["test"] = str(num1)+"+"+str(num2)
         log.log.info("Ready to send %d and %d", num1, num2)
-            
+
         rcvdict = self.connection.send(data)
-        
+
         if rcvdict['result'] == num1+num2:
             print("Ping Success")
             log.log.info("Ping Success,%d plus %d = %d",
@@ -110,7 +113,7 @@ class ClientTransactionInterface(object):
         文件名为1,2,3,4,5
         '''
         log.log.info("Starting Generating wordlist")
-        
+
         for i in range(FILES_AMOUNT):
             Filename = str(i+1)+".txt"
             with open(Filename, "w")as f:
@@ -126,7 +129,48 @@ class ClientTransactionInterface(object):
                 log.log.info("File %d written", i+1)
         return
 
+    def gen_key(self, SEED_LEN=20):
+        log.log.info("Start generating list")
+        k1 = Fernet.generate_key()  # k
+        k2 = Fernet.generate_key()  # k'
+        log.log.debug("key generated:k1=%s,k2=%s",
+                      str(k1), str(k2))
+        # Gen Seed
+        seed = secrets.token_bytes(nbytes=SEED_LEN)
+        log.log.debug("Seed generated:seed=%s", str(seed))
 
+        # Write Files
+        with open("k.bin", "wb") as f:
+            f.write(k1)
+            f.close()
+        with open("k'.bin", "wb") as f:
+            f.write(k2)
+            f.close()
+        with open("seed.bin", "wb") as s:
+            s.write(seed)
+            s.close()
+        return
+    def load_keys(self)->list:
+        '''
+        description: Load keys via files
+        param {None}
+        return {list of keys,[k1,k2,seed]}
+        '''
+        with open("k.bin", "rb") as f:
+            k1=f.read(f)
+            f.close()
+        with open("k'.bin", "rb") as f:
+            k2=f.read(f)
+            f.close()
+        with open("seed.bin", "rb") as s:
+            s=s.read(f)
+            s.close()
+        log.log.debug("load key:%s",str([k1,k2,s]))
+        return [k1,k2,s]
+    def encrypt(self):
+        # load keys
+        KeysList=self.load_keys()
+        pass
 if __name__ == "__main__":
 
     menu = Menu()
