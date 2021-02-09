@@ -1,7 +1,7 @@
 '''
 Author: I-Hsien
 Date: 2021-01-28 20:02:50
-LastEditTime: 2021-02-06 20:50:17
+LastEditTime: 2021-02-09 13:37:25
 LastEditors: I-Hsien
 Description: Client Program
 FilePath: \Searchable-Encryption-Demos\SWP Solution\local.py
@@ -15,6 +15,7 @@ import random
 import string
 import Log as log
 import secrets
+import base64
 from cryptography.fernet import Fernet
 
 
@@ -150,26 +151,80 @@ class ClientTransactionInterface(object):
             s.write(seed)
             s.close()
         return
-    def load_keys(self)->list:
+    def load_keys(self,FILE_LIST=["k.bin","k'.bin","seed.bin"])->list:
         '''
         description: Load keys via files
         param {None}
         return {list of keys,[k1,k2,seed]}
         '''
-        with open("k.bin", "rb") as f:
+        try :
+            f=open("k.bin", "rb")
             k1=f.read(f)
+        except IOError:
+            log.log.error("No Such File:k")
+            return None
+        else:
+            log.log.info("Read k successed")
             f.close()
-        with open("k'.bin", "rb") as f:
+        
+        try :
+            f=open("k'.bin", "rb")
             k2=f.read(f)
+        except IOError:
+            log.log.error("No Such File:k'")
+            return None
+        else:
+            log.log.info("Read k' successed")
             f.close()
-        with open("seed.bin", "rb") as s:
-            s=s.read(f)
-            s.close()
+        
+        try :
+            f=open("seed.bin", "rb")
+            s=f.read(f)
+        except IOError:
+            log.log.error("No Such File:seed")
+            return None
+        else:
+            log.log.info("Read seed successed")
+            f.close()
         log.log.debug("load key:%s",str([k1,k2,s]))
         return [k1,k2,s]
     def encrypt(self):
         # load keys
-        KeysList=self.load_keys()
+        KeysList=self.load_keys()#[k1,k2,s]
+        if not KeysList:
+            log.log.error("Load key failed:see above for more info")
+            return
+        k1=KeysList[0]
+        k2=KeysList[1]
+        seed=KeysList[2]
+        
+        # load words
+        PlainList=list()
+        for i in range(10):
+            filename=str(i+1)+".txt"
+            with open(filename,"r") as f:
+                rawstr=f.read()
+                f.close()
+            tmplist=rawstr.split(",")
+            TmpListBin=list()
+            for item in tmplist:
+                TmpListBin.append(item.encode(encoding='utf-8'))
+            PlainList.append(TmpListBin)
+        
+        # Ready for symmetric encryption
+        f = Fernet(k2)
+        EncryptList=list()# To save encrypted words.[[file1],[file2],...]
+        for wordlist in PlainList:#For each file
+            tmplist=list()#NOTE Base-64 decoded, for division
+            for plain in wordlist:#For each word
+                ciphertext=f.encrypt(plain) # Base-64 encoded
+                # TODO decode and division,See lab
+                
+                
+                log.log.debug("Encrypt finish,%s->%s",str(plain),str(ciphertext))
+            log.log.debug("One file encrypt finished")
+            
+        
         pass
 if __name__ == "__main__":
 
