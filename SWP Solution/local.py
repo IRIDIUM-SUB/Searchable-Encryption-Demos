@@ -1,7 +1,7 @@
 '''
 Author: I-Hsien
 Date: 2021-01-28 20:02:50
-LastEditTime: 2021-02-09 13:37:25
+LastEditTime: 2021-02-15 13:41:25
 LastEditors: I-Hsien
 Description: Client Program
 FilePath: \Searchable-Encryption-Demos\SWP Solution\local.py
@@ -16,6 +16,7 @@ import string
 import Log as log
 import secrets
 import base64
+import hmac
 from cryptography.fernet import Fernet
 
 
@@ -70,7 +71,7 @@ class Menu(object):
     def quit(self):
         print("\nThank you for using this script!\n")
         log.log.info("Exit")
-        sys.exit() # Exit Now
+        sys.exit()  # Exit Now
 
 
 class ClientTransactionInterface(object):
@@ -130,15 +131,17 @@ class ClientTransactionInterface(object):
                 log.log.info("File %d written", i+1)
         return
 
-    def gen_key(self, SEED_LEN=20):
+    def gen_key(self, FILES_AMOUNT=10, SEED_LEN=30):
         log.log.info("Start generating list")
         k1 = Fernet.generate_key()  # k
         k2 = Fernet.generate_key()  # k'
         log.log.debug("key generated:k1=%s,k2=%s",
                       str(k1), str(k2))
         # Gen Seed
-        seed = secrets.token_bytes(nbytes=SEED_LEN)
-        log.log.debug("Seed generated:seed=%s", str(seed))
+        SeedList = list()
+        for _ in range(FILES_AMOUNT):
+            SeedList.append(secrets.token_bytes(nbytes=SEED_LEN))
+        log.log.debug("Seed generated:seed=%s", str(SeedList))
 
         # Write Files
         with open("k.bin", "wb") as f:
@@ -148,84 +151,110 @@ class ClientTransactionInterface(object):
             f.write(k2)
             f.close()
         with open("seed.bin", "wb") as s:
-            s.write(seed)
+            for i in range(FILES_AMOUNT):  # Write seedlist
+                s.write(SeedList[i])
             s.close()
         return
-    def load_keys(self,FILE_LIST=["k.bin","k'.bin","seed.bin"])->list:
+
+    def load_keys(self, FILE_LIST=["k.bin", "k'.bin", "seed.bin"]) -> list:
         '''
         description: Load keys via files
         param {None}
         return {list of keys,[k1,k2,seed]}
         '''
-        try :
-            f=open("k.bin", "rb")
-            k1=f.read(f)
+        try:
+            f = open("k.bin", "rb")
+            k1 = f.read(f)
         except IOError:
             log.log.error("No Such File:k")
             return None
         else:
             log.log.info("Read k successed")
             f.close()
-        
-        try :
-            f=open("k'.bin", "rb")
-            k2=f.read(f)
+
+        try:
+            f = open("k'.bin", "rb")
+            k2 = f.read(f)
         except IOError:
             log.log.error("No Such File:k'")
             return None
         else:
             log.log.info("Read k' successed")
             f.close()
-        
-        try :
-            f=open("seed.bin", "rb")
-            s=f.read(f)
+
+        try:
+            f = open("seed.bin", "rb")
+            s = f.readlines(f)
+            # Processing
+            p = list()
+            for items in s:
+                p.append(items.strip())
+
         except IOError:
             log.log.error("No Such File:seed")
             return None
         else:
             log.log.info("Read seed successed")
             f.close()
-        log.log.debug("load key:%s",str([k1,k2,s]))
-        return [k1,k2,s]
-    def encrypt(self):
+        log.log.debug("load key:%s", str([k1, k2, p]))
+        return [k1, k2, p]
+
+    def encrypt(self, FILES_AMOUNT=10):
         # load keys
-        KeysList=self.load_keys()#[k1,k2,s]
+        KeysList = self.load_keys()  # [k1,k2,s]
         if not KeysList:
             log.log.error("Load key failed:see above for more info")
             return
-        k1=KeysList[0]
-        k2=KeysList[1]
-        seed=KeysList[2]
-        
+        k1 = KeysList[0]
+        k2 = KeysList[1]
+        SeedList = KeysList[2]
+
         # load words
-        PlainList=list()
-        for i in range(10):
-            filename=str(i+1)+".txt"
-            with open(filename,"r") as f:
-                rawstr=f.read()
+        CHIPER_LEN = 74  # chipertext should be byte and length is 74
+        PlainList = list()
+        for i in range(FILES_AMOUNT):
+            filename = str(i+1)+".txt"
+            with open(filename, "r") as f:
+                rawstr = f.read()
                 f.close()
-            tmplist=rawstr.split(",")
-            TmpListBin=list()
+            tmplist = rawstr.split(",")
+            TmpListBin = list()
             for item in tmplist:
                 TmpListBin.append(item.encode(encoding='utf-8'))
             PlainList.append(TmpListBin)
-        
+            log.log.debug("Plainlist is ", str(PlainList))
         # Ready for symmetric encryption
         f = Fernet(k2)
-        EncryptList=list()# To save encrypted words.[[file1],[file2],...]
-        for wordlist in PlainList:#For each file
-            tmplist=list()#NOTE Base-64 decoded, for division
-            for plain in wordlist:#For each word
-                ciphertext=f.encrypt(plain) # Base-64 encoded
-                # TODO decode and division,See lab
-                
-                
-                log.log.debug("Encrypt finish,%s->%s",str(plain),str(ciphertext))
+        EncryptList = list()  # To save encrypted words.[[file1],[file2],...]
+        for i in range(len(PlainList)):  # For each file
+            WordList = PlainList[i]
+            seed = SeedList[i]  # Select seed
+            tmplist = list()  # NOTE Base-64 decoded, for division
+            for j in range(len(WordList)):  # For each word, main loop
+                plain = WordList[j]
+
+                ciphertext = f.encrypt(plain)  # Base-64 encoded
+
+                # Base64 decoded chipertext,should be byte and length is 74
+                FlatChipertext = base64.urlsafe_b64decode(ciphertext)+b"\x00"
+                LeftChipertext, RightCHipertext = [
+                    FlatChipertext[:CHIPER_LEN/2], FlatChipertext[CHIPER_LEN/2:]]
+
+                # Generate key ki, using hmac-md5,ki=f(L,k')
+                k = hmac.new(k1, LeftChipertext,
+                             digestmod='MD5').digest()  # k is byte
+                log.log.debug("Generate k is", k)
+
+                # Seed stream
+                # Use LSFR, but bin string?
+
+                log.log.debug("Encrypt finish,%s->%s",
+                              str(plain), str(ciphertext))
             log.log.debug("One file encrypt finished")
-            
-        
+
         pass
+
+
 if __name__ == "__main__":
 
     menu = Menu()
