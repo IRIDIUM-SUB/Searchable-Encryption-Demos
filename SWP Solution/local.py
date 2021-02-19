@@ -1,7 +1,7 @@
 '''
 Author: I-Hsien
 Date: 2021-01-28 20:02:50
-LastEditTime: 2021-02-15 13:41:25
+LastEditTime: 2021-02-19 13:04:04
 LastEditors: I-Hsien
 Description: Client Program
 FilePath: \Searchable-Encryption-Demos\SWP Solution\local.py
@@ -17,6 +17,7 @@ import Log as log
 import secrets
 import base64
 import hmac
+import LSFR
 from cryptography.fernet import Fernet
 
 
@@ -131,7 +132,7 @@ class ClientTransactionInterface(object):
                 log.log.info("File %d written", i+1)
         return
 
-    def gen_key(self, FILES_AMOUNT=10, SEED_LEN=30):
+    def gen_key(self, FILES_AMOUNT=10, SEED_LEN=6):
         log.log.info("Start generating list")
         k1 = Fernet.generate_key()  # k
         k2 = Fernet.generate_key()  # k'
@@ -226,10 +227,26 @@ class ClientTransactionInterface(object):
         # Ready for symmetric encryption
         f = Fernet(k2)
         EncryptList = list()  # To save encrypted words.[[file1],[file2],...]
-        for i in range(len(PlainList)):  # For each file
+        for i in range(len(PlainList)):  # For each file,get index
             WordList = PlainList[i]
             seed = SeedList[i]  # Select seed
             tmplist = list()  # NOTE Base-64 decoded, for division
+
+            # Seed stream
+            # Use 5-LSFR, but bin string?
+            # 处理seed
+            seed = SeedList[i]  # seed is the current seed
+            seedbin = list()  # processed seed: like [00011,11100,...]
+            for s in seed:
+                seedbin.append(str(bin(s))[2:].rjust(8, "0")[-5:])
+            log.log.debug("LFSR1反馈函数常数c的序列Cn~C1:%s", seedbin[0])
+            log.log.debug("LFSR2反馈函数常数c的序列Cn~C1:%s", seedbin[1])
+            log.log.debug("LFSR3反馈函数常数c的序列Cn~C1:%s", seedbin[2])
+            log.log.debug("LFSR1寄存器的初始状态An~A1:%s", seedbin[3])
+            log.log.debug("LFSR2寄存器的初始状态An~A1:%s", seedbin[4])
+            log.log.debug("LFSR3寄存器的初始状态An~A1:%s", seedbin[5])
+            stream = self.gen_stream(seedbin)  # length is 4000 !
+
             for j in range(len(WordList)):  # For each word, main loop
                 plain = WordList[j]
 
@@ -243,16 +260,31 @@ class ClientTransactionInterface(object):
                 # Generate key ki, using hmac-md5,ki=f(L,k')
                 k = hmac.new(k1, LeftChipertext,
                              digestmod='MD5').digest()  # k is byte
-                log.log.debug("Generate k is", k)
-
-                # Seed stream
-                # Use LSFR, but bin string?
+                log.log.debug("Generate k is %s", k)
+                # 一个字符长8位，一个单词需要40位, here is Si.
+                CurrentStream = stream[40*j:40*j+40]
+                log.log.debug("Current stream is %s", CurrentStream)
 
                 log.log.debug("Encrypt finish,%s->%s",
                               str(plain), str(ciphertext))
             log.log.debug("One file encrypt finished")
-
         pass
+
+    def gen_stream(self, seed: list, STREAM_LEN=4000):
+        '''
+        description: 生成基于LSFR+Gaffe移位器的初始状态
+        param {Raw seed gened by secrets.token_bytes}}
+        return {stream in some len}
+        '''
+        return LSFR.gen_stream(seed, STREAM_LEN)
+
+    def XOR(self, xor1, xor2):
+        '''
+        description: Universal XOR tool, but paras should be processed in advanced
+        param {*}
+        return {*}
+        '''
+        return bin(xor1 ^ xor2)[2:]
 
 
 if __name__ == "__main__":
