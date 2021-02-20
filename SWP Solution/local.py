@@ -1,7 +1,7 @@
 '''
 Author: I-Hsien
 Date: 2021-01-28 20:02:50
-LastEditTime: 2021-02-19 13:04:04
+LastEditTime: 2021-02-20 21:37:20
 LastEditors: I-Hsien
 Description: Client Program
 FilePath: \Searchable-Encryption-Demos\SWP Solution\local.py
@@ -34,6 +34,7 @@ class Menu(object):
             "1": self.client.connection_test,
             "3": self.client.gen_wordlist,
             "2": self.client.gen_key,
+            "4": self.client.encrypt,
             "0": self.quit
         }
 
@@ -165,7 +166,7 @@ class ClientTransactionInterface(object):
         '''
         try:
             f = open("k.bin", "rb")
-            k1 = f.read(f)
+            k1 = f.read()
         except IOError:
             log.log.error("No Such File:k")
             return None
@@ -175,7 +176,7 @@ class ClientTransactionInterface(object):
 
         try:
             f = open("k'.bin", "rb")
-            k2 = f.read(f)
+            k2 = f.read()
         except IOError:
             log.log.error("No Such File:k'")
             return None
@@ -185,7 +186,7 @@ class ClientTransactionInterface(object):
 
         try:
             f = open("seed.bin", "rb")
-            s = f.readlines(f)
+            s = f.readlines()
             # Processing
             p = list()
             for items in s:
@@ -223,7 +224,7 @@ class ClientTransactionInterface(object):
             for item in tmplist:
                 TmpListBin.append(item.encode(encoding='utf-8'))
             PlainList.append(TmpListBin)
-            log.log.debug("Plainlist is ", str(PlainList))
+            #log.log.debug("Plainlist is %s", str(PlainList))
         # Ready for symmetric encryption
         f = Fernet(k2)
         EncryptList = list()  # To save encrypted words.[[file1],[file2],...]
@@ -255,22 +256,33 @@ class ClientTransactionInterface(object):
                 # Base64 decoded chipertext,should be byte and length is 74
                 FlatChipertext = base64.urlsafe_b64decode(ciphertext)+b"\x00"
                 LeftChipertext, RightCHipertext = [
-                    FlatChipertext[:CHIPER_LEN/2], FlatChipertext[CHIPER_LEN/2:]]
+                    FlatChipertext[:int(CHIPER_LEN/2)], FlatChipertext[int(CHIPER_LEN/2):]]
 
                 # Generate key ki, using hmac-md5,ki=f(L,k')
                 k = hmac.new(k1, LeftChipertext,
                              digestmod='MD5').digest()  # k is byte
-                log.log.debug("Generate k is %s", k)
-                # 一个字符长8位，一个单词需要40位, here is Si.
-                CurrentStream = stream[40*j:40*j+40]
+                log.log.debug("Generate k is %s", str(k))
+                # 一个字符长8位，一个单词需要8位, here is Si.
+                CurrentStream = stream[8*j:8*j+8]
                 log.log.debug("Current stream is %s", CurrentStream)
-
+                # F(Si,ki),需要进行处理:Si要转化成bytes。k已经是bytes。转化使用bytes([oct])
+                
+                HashedStream=hmac.new(k, bytes([int(CurrentStream,2)]),
+                             digestmod='SHA1').digest() #Bytes
+                log.log.debug("Hashed Stream F(Si,ki) is %s",str(HashedStream))
+                CombinedHashedStream=bytes([int(CurrentStream,2)])+HashedStream # Y
+                #Y XOR X,bytes xor bytes
+                log.log.debug("X is %s",str(FlatChipertext))
+                log.log.debug("Y is %s",str(CombinedHashedStream))
+                ciphertext=FlatChipertext^CombinedHashedStream
+                # TODO: 长度似乎还是需要对齐。。。需要调整stream的长度。已知@Flat是74位长bytes。
                 log.log.debug("Encrypt finish,%s->%s",
                               str(plain), str(ciphertext))
+                tmplist.append(ciphertext)
             log.log.debug("One file encrypt finished")
-        pass
+        #Encrypt Phase Finished
 
-    def gen_stream(self, seed: list, STREAM_LEN=4000):
+    def gen_stream(self, seed: list, STREAM_LEN=800):
         '''
         description: 生成基于LSFR+Gaffe移位器的初始状态
         param {Raw seed gened by secrets.token_bytes}}
@@ -278,13 +290,6 @@ class ClientTransactionInterface(object):
         '''
         return LSFR.gen_stream(seed, STREAM_LEN)
 
-    def XOR(self, xor1, xor2):
-        '''
-        description: Universal XOR tool, but paras should be processed in advanced
-        param {*}
-        return {*}
-        '''
-        return bin(xor1 ^ xor2)[2:]
 
 
 if __name__ == "__main__":
