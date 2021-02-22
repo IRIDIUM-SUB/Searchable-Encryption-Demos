@@ -1,7 +1,7 @@
 '''
 Author: I-Hsien
 Date: 2021-01-28 20:02:50
-LastEditTime: 2021-02-20 21:37:20
+LastEditTime: 2021-02-21 17:37:23
 LastEditors: I-Hsien
 Description: Client Program
 FilePath: \Searchable-Encryption-Demos\SWP Solution\local.py
@@ -213,6 +213,7 @@ class ClientTransactionInterface(object):
 
         # load words
         CHIPER_LEN = 74  # chipertext should be byte and length is 74
+
         PlainList = list()
         for i in range(FILES_AMOUNT):
             filename = str(i+1)+".txt"
@@ -237,6 +238,7 @@ class ClientTransactionInterface(object):
             # Use 5-LSFR, but bin string?
             # 处理seed
             seed = SeedList[i]  # seed is the current seed
+            SEED_LEN_PER_WORD = 20  # NOTE 亦或一个单词需要的01流长度；需要调整
             seedbin = list()  # processed seed: like [00011,11100,...]
             for s in seed:
                 seedbin.append(str(bin(s))[2:].rjust(8, "0")[-5:])
@@ -246,7 +248,7 @@ class ClientTransactionInterface(object):
             log.log.debug("LFSR1寄存器的初始状态An~A1:%s", seedbin[3])
             log.log.debug("LFSR2寄存器的初始状态An~A1:%s", seedbin[4])
             log.log.debug("LFSR3寄存器的初始状态An~A1:%s", seedbin[5])
-            stream = self.gen_stream(seedbin)  # length is 4000 !
+            stream = self.gen_stream(seedbin, SEED_LEN_PER_WORD)
 
             for j in range(len(WordList)):  # For each word, main loop
                 plain = WordList[j]
@@ -262,34 +264,61 @@ class ClientTransactionInterface(object):
                 k = hmac.new(k1, LeftChipertext,
                              digestmod='MD5').digest()  # k is byte
                 log.log.debug("Generate k is %s", str(k))
-                # 一个字符长8位，一个单词需要8位, here is Si.
-                CurrentStream = stream[8*j:8*j+8]
+                # here is Si.
+                CurrentStream = stream[SEED_LEN_PER_WORD *
+                                       j:SEED_LEN_PER_WORD*j+SEED_LEN_PER_WORD]
                 log.log.debug("Current stream is %s", CurrentStream)
                 # F(Si,ki),需要进行处理:Si要转化成bytes。k已经是bytes。转化使用bytes([oct])
-                
-                HashedStream=hmac.new(k, bytes([int(CurrentStream,2)]),
-                             digestmod='SHA1').digest() #Bytes
-                log.log.debug("Hashed Stream F(Si,ki) is %s",str(HashedStream))
-                CombinedHashedStream=bytes([int(CurrentStream,2)])+HashedStream # Y
-                #Y XOR X,bytes xor bytes
-                log.log.debug("X is %s",str(FlatChipertext))
-                log.log.debug("Y is %s",str(CombinedHashedStream))
-                ciphertext=FlatChipertext^CombinedHashedStream
+
+                HashedStream = hmac.new(k, b"",
+                                        digestmod='SHA1')  # TODO Stream过长时需要分割，8个为限。
+                for l in range(int(len(CurrentStream)/8)):
+                    if l == 0:
+                        log.log.debug("Update Stream:%s", str(
+                            CurrentStream[-(l*8)-8:]))
+                        HashedStream.update(
+                            bytes([int(CurrentStream[-(l*8)-8:], 2)]))
+                    else:
+                        log.log.debug("Update Stream:%s", str(
+                            CurrentStream[-(l*8)-8:-(8*l)]))
+                        HashedStream.update(
+                            bytes([int(CurrentStream[-(l*8)-8:-(8*l)], 2)]))
+                # 准备byte化的CurrentStream
+                CurrentStreamByte = b""
+                for l in range(int(len(CurrentStream)/8)):
+                    if l == 0:
+                        CurrentStreamByte = bytes(
+                            [int(CurrentStream[-(l*8)-8:], 2)])
+                    else:
+                        CurrentStreamByte += bytes(
+                            [int(CurrentStream[-(l*8)-8:-(8*l)], 2)])
+
+                log.log.debug("Hashed Stream F(Si,ki) is %s",
+                              str(HashedStream.digest()))
+                CombinedHashedStream = CurrentStreamByte+HashedStream.digest()  # Y
+                # Y XOR X,bytes xor bytes
+                log.log.debug("X is %s,len=%d", str(
+                    FlatChipertext), len(FlatChipertext))
+                log.log.debug("Y is %s,len=%d", str(
+                    CombinedHashedStream), len(CombinedHashedStream))
+                ciphertext = FlatChipertext ^ CombinedHashedStream
                 # TODO: 长度似乎还是需要对齐。。。需要调整stream的长度。已知@Flat是74位长bytes。
+                # Ready to XOR
+
                 log.log.debug("Encrypt finish,%s->%s",
                               str(plain), str(ciphertext))
                 tmplist.append(ciphertext)
             log.log.debug("One file encrypt finished")
-        #Encrypt Phase Finished
+        # Encrypt Phase Finished
 
-    def gen_stream(self, seed: list, STREAM_LEN=800):
+    def gen_stream(self, seed: list, SEED_LEN_PER_WORD):
         '''
         description: 生成基于LSFR+Gaffe移位器的初始状态
         param {Raw seed gened by secrets.token_bytes}}
         return {stream in some len}
         '''
+        STREAM_LEN = SEED_LEN_PER_WORD*100  # 100 words in total
         return LSFR.gen_stream(seed, STREAM_LEN)
-
 
 
 if __name__ == "__main__":
