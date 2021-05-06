@@ -1,7 +1,7 @@
 '''
 Author: I-Hsien
 Date: 2021-01-28 20:02:50
-LastEditTime: 2021-02-21 17:37:23
+LastEditTime: 2021-05-04 11:25:43
 LastEditors: I-Hsien
 Description: Client Program
 FilePath: \Searchable-Encryption-Demos\SWP Solution\local.py
@@ -11,14 +11,15 @@ import network
 import pprint
 import os
 import sys
-import random
 import string
 import Log as log
-import secrets
-import base64
-import hmac
-import LSFR
+import pickle
 from cryptography.fernet import Fernet
+from fuzzy_extractor import FuzzyExtractor
+from charm.toolbox.pairinggroup import PairingGroup, ZR, G1, G2, GT, pair
+import hashlib
+import random
+Hash1pre = hashlib.md5
 
 
 class Menu(object):
@@ -32,9 +33,11 @@ class Menu(object):
 
         self.choices = {
             "1": self.client.connection_test,
-            "3": self.client.gen_wordlist,
+            "4": self.client.gen_wordlist,
             "2": self.client.gen_key,
-            "4": self.client.encrypt,
+            "5": self.client.encrypt,
+            "6": self.client.query,
+            "3": self.client.load_key,
             "0": self.quit
         }
 
@@ -42,9 +45,10 @@ class Menu(object):
         self.pp.pprint("SMP Demo")
         self.pp.pprint("1. Connection Test")
         self.pp.pprint("2. Generate Key")
-        self.pp.pprint("3. Generate Wordlist")
-        self.pp.pprint("4. Encrypt and Upload")
-        self.pp.pprint("5. Query")
+        self.pp.pprint("3. Recover Key")
+        self.pp.pprint("4. Generate Wordlist")
+        self.pp.pprint("5. Encrypt and Upload")
+        self.pp.pprint("6. Query")
         self.pp.pprint("0. Exit")
         self.pp.pprint("-----------------------")
         log.log.debug("Menu displayed")
@@ -83,6 +87,11 @@ class ClientTransactionInterface(object):
 
     def __init__(self):
         self.connection = network.connection()  # initialize connection class
+        self.extractor = FuzzyExtractor(16, 10)
+        self.param_id = 'SS512'
+        self.group = PairingGroup(self.param_id)
+        self.sk = None
+        self.pk = None
 
     def connection_test(self):
         '''
@@ -111,7 +120,7 @@ class ClientTransactionInterface(object):
             print("Ping Failed")
             log.log.warning("Ping Failed")
 
-    def gen_wordlist(self, FILES_AMOUNT=10, WORDS_PER_FILE=500, WORD_LEN=5) -> None:
+    def gen_wordlist(self, FILES_AMOUNT=10, WORDS_PER_FILE=5, WORD_LEN=5) -> None:
         '''
         生成若干个文件，每个文件包含若干个单词，单词不重复且随机
         文件名为1,2,3,4,5
@@ -133,193 +142,162 @@ class ClientTransactionInterface(object):
                 log.log.info("File %d written", i+1)
         return
 
-    def gen_key(self, FILES_AMOUNT=10, SEED_LEN=6):
+    def gen_key(self):
         log.log.info("Start generating list")
-        k1 = Fernet.generate_key()  # k
-        k2 = Fernet.generate_key()  # k'
-        log.log.debug("key generated:k1=%s,k2=%s",
-                      str(k1), str(k2))
-        # Gen Seed
-        SeedList = list()
-        for _ in range(FILES_AMOUNT):
-            SeedList.append(secrets.token_bytes(nbytes=SEED_LEN))
-        log.log.debug("Seed generated:seed=%s", str(SeedList))
-
-        # Write Files
-        with open("k.bin", "wb") as f:
-            f.write(k1)
-            f.close()
-        with open("k'.bin", "wb") as f:
-            f.write(k2)
-            f.close()
-        with open("seed.bin", "wb") as s:
-            for i in range(FILES_AMOUNT):  # Write seedlist
-                s.write(SeedList[i])
-            s.close()
-        return
-
-    def load_keys(self, FILE_LIST=["k.bin", "k'.bin", "seed.bin"]) -> list:
-        '''
-        description: Load keys via files
-        param {None}
-        return {list of keys,[k1,k2,seed]}
-        '''
-        try:
-            f = open("k.bin", "rb")
-            k1 = f.read()
-        except IOError:
-            log.log.error("No Such File:k")
-            return None
-        else:
-            log.log.info("Read k successed")
-            f.close()
-
-        try:
-            f = open("k'.bin", "rb")
-            k2 = f.read()
-        except IOError:
-            log.log.error("No Such File:k'")
-            return None
-        else:
-            log.log.info("Read k' successed")
-            f.close()
-
-        try:
-            f = open("seed.bin", "rb")
-            s = f.readlines()
-            # Processing
-            p = list()
-            for items in s:
-                p.append(items.strip())
-
-        except IOError:
-            log.log.error("No Such File:seed")
-            return None
-        else:
-            log.log.info("Read seed successed")
-            f.close()
-        log.log.debug("load key:%s", str([k1, k2, p]))
-        return [k1, k2, p]
-
-    def encrypt(self, FILES_AMOUNT=10):
-        # load keys
-        KeysList = self.load_keys()  # [k1,k2,s]
-        if not KeysList:
-            log.log.error("Load key failed:see above for more info")
+        # Fuzzy Here
+        fingerprint = input("Put in Fuzzy Fingerprints")
+        if len(fingerprint) != 16:
+            log.log.error("Wrong fingerprint format")
             return
-        k1 = KeysList[0]
-        k2 = KeysList[1]
-        SeedList = KeysList[2]
+        key, helper = self.extractor.generate(fingerprint)
+        log.log.info("Fuzzy key generated")
+        # Save helper
+        with open("helper.bin", "wb")as f:
+            pickle.dump(helper, f)
+            f.close()
+        # Generate true key
+        random.seed(key)
+        i = random.randint(-300000, 300000)
+        log.log.debug("Random seed generated:%d", i)
+        self.g = self.group.random(G1, seed=i)
+        self.alpha = self.group.random(ZR, seed=i)
+        log.log.debug("G and Alpha generated:%s and %s",
+                      str(self.g), str(self.alpha))
+        self.sk = self.group.serialize(self.alpha)
+        self.pk = [self.group.serialize(
+            self.g), self.group.serialize(self.g ** self.alpha)]
+        log.log.info("sk and pk generated!")
 
-        # load words
-        CHIPER_LEN = 74  # chipertext should be byte and length is 74
-
-        PlainList = list()
-        for i in range(FILES_AMOUNT):
-            filename = str(i+1)+".txt"
-            with open(filename, "r") as f:
-                rawstr = f.read()
-                f.close()
-            tmplist = rawstr.split(",")
-            TmpListBin = list()
-            for item in tmplist:
-                TmpListBin.append(item.encode(encoding='utf-8'))
-            PlainList.append(TmpListBin)
-            #log.log.debug("Plainlist is %s", str(PlainList))
-        # Ready for symmetric encryption
-        f = Fernet(k2)
-        EncryptList = list()  # To save encrypted words.[[file1],[file2],...]
-        for i in range(len(PlainList)):  # For each file,get index
-            WordList = PlainList[i]
-            seed = SeedList[i]  # Select seed
-            tmplist = list()  # NOTE Base-64 decoded, for division
-
-            # Seed stream
-            # Use 5-LSFR, but bin string?
-            # 处理seed
-            seed = SeedList[i]  # seed is the current seed
-            SEED_LEN_PER_WORD = 20  # NOTE 亦或一个单词需要的01流长度；需要调整
-            seedbin = list()  # processed seed: like [00011,11100,...]
-            for s in seed:
-                seedbin.append(str(bin(s))[2:].rjust(8, "0")[-5:])
-            log.log.debug("LFSR1反馈函数常数c的序列Cn~C1:%s", seedbin[0])
-            log.log.debug("LFSR2反馈函数常数c的序列Cn~C1:%s", seedbin[1])
-            log.log.debug("LFSR3反馈函数常数c的序列Cn~C1:%s", seedbin[2])
-            log.log.debug("LFSR1寄存器的初始状态An~A1:%s", seedbin[3])
-            log.log.debug("LFSR2寄存器的初始状态An~A1:%s", seedbin[4])
-            log.log.debug("LFSR3寄存器的初始状态An~A1:%s", seedbin[5])
-            stream = self.gen_stream(seedbin, SEED_LEN_PER_WORD)
-
-            for j in range(len(WordList)):  # For each word, main loop
-                plain = WordList[j]
-
-                ciphertext = f.encrypt(plain)  # Base-64 encoded
-
-                # Base64 decoded chipertext,should be byte and length is 74
-                FlatChipertext = base64.urlsafe_b64decode(ciphertext)+b"\x00"
-                LeftChipertext, RightCHipertext = [
-                    FlatChipertext[:int(CHIPER_LEN/2)], FlatChipertext[int(CHIPER_LEN/2):]]
-
-                # Generate key ki, using hmac-md5,ki=f(L,k')
-                k = hmac.new(k1, LeftChipertext,
-                             digestmod='MD5').digest()  # k is byte
-                log.log.debug("Generate k is %s", str(k))
-                # here is Si.
-                CurrentStream = stream[SEED_LEN_PER_WORD *
-                                       j:SEED_LEN_PER_WORD*j+SEED_LEN_PER_WORD]
-                log.log.debug("Current stream is %s", CurrentStream)
-                # F(Si,ki),需要进行处理:Si要转化成bytes。k已经是bytes。转化使用bytes([oct])
-
-                HashedStream = hmac.new(k, b"",
-                                        digestmod='SHA1')  # TODO Stream过长时需要分割，8个为限。
-                for l in range(int(len(CurrentStream)/8)):
-                    if l == 0:
-                        log.log.debug("Update Stream:%s", str(
-                            CurrentStream[-(l*8)-8:]))
-                        HashedStream.update(
-                            bytes([int(CurrentStream[-(l*8)-8:], 2)]))
-                    else:
-                        log.log.debug("Update Stream:%s", str(
-                            CurrentStream[-(l*8)-8:-(8*l)]))
-                        HashedStream.update(
-                            bytes([int(CurrentStream[-(l*8)-8:-(8*l)], 2)]))
-                # 准备byte化的CurrentStream
-                CurrentStreamByte = b""
-                for l in range(int(len(CurrentStream)/8)):
-                    if l == 0:
-                        CurrentStreamByte = bytes(
-                            [int(CurrentStream[-(l*8)-8:], 2)])
-                    else:
-                        CurrentStreamByte += bytes(
-                            [int(CurrentStream[-(l*8)-8:-(8*l)], 2)])
-
-                log.log.debug("Hashed Stream F(Si,ki) is %s",
-                              str(HashedStream.digest()))
-                CombinedHashedStream = CurrentStreamByte+HashedStream.digest()  # Y
-                # Y XOR X,bytes xor bytes
-                log.log.debug("X is %s,len=%d", str(
-                    FlatChipertext), len(FlatChipertext))
-                log.log.debug("Y is %s,len=%d", str(
-                    CombinedHashedStream), len(CombinedHashedStream))
-                ciphertext = FlatChipertext ^ CombinedHashedStream
-                # TODO: 长度似乎还是需要对齐。。。需要调整stream的长度。已知@Flat是74位长bytes。
-                # Ready to XOR
-
-                log.log.debug("Encrypt finish,%s->%s",
-                              str(plain), str(ciphertext))
-                tmplist.append(ciphertext)
-            log.log.debug("One file encrypt finished")
-        # Encrypt Phase Finished
-
-    def gen_stream(self, seed: list, SEED_LEN_PER_WORD):
+    def load_key(self, HELPER_PATH="helper.bin") -> None:
         '''
-        description: 生成基于LSFR+Gaffe移位器的初始状态
-        param {Raw seed gened by secrets.token_bytes}}
-        return {stream in some len}
+        description: Load helper and try to recover and recover true key
         '''
-        STREAM_LEN = SEED_LEN_PER_WORD*100  # 100 words in total
-        return LSFR.gen_stream(seed, STREAM_LEN)
+        try:
+            f = open(HELPER_PATH, "rb")
+            helper = pickle.load(f)
+        except IOError:
+            log.log.error("No Such File:HELPER")
+            return None
+        else:
+            log.log.info("Read HELPER successed")
+            f.close()
+        fingerprint = input("Put in Fuzzy Fingerprints")
+        r_key = self.extractor.reproduce(fingerprint, helper)
+        if not r_key:
+            log.log.error("Key Recovery Failed")
+            return
+        else:
+            log.log.debug("Key Recovered:%s", str(r_key))
+            # Gen true key
+            random.seed(r_key)
+            i = random.randint(-300000, 300000)
+            log.log.debug("Random seed generated:%d", i)
+            g = self.group.random(G1, seed=i)
+            alpha = self.group.random(ZR, seed=i)
+            log.log.debug("G and Alpha RECOVERED:%s and %s",
+                          str(g), str(alpha))
+            self.sk = self.group.serialize(alpha)
+            self.pk = [self.group.serialize(
+                g), self.group.serialize(g ** alpha)]
+            log.log.info("sk and pk recovered!")
+            return
 
+    def Enc(self, w, param_id='SS512'):
+        '''
+        work method
+        之前已经检验过了pk 和 sk
+        '''
+        #group = PairingGroup(param_id)
+        # 进行反序列化
+        g, h = self.group.deserialize(
+            self.pk[0]), self.group.deserialize(self.pk[1])
+        r = self.group.random(ZR)
+        t = pair(self.Hash1(w), h ** r)
+        c1 = g ** r
+        c2 = t
+        # 对密文进行序列化
+
+        return [self.group.serialize(c1), Hash2(self.group.serialize(c2)).hexdigest()]
+
+    def encrypt(self, FILE_AMOUNT=5, param_id='SS512'):
+        if not self.sk or not self.pk:
+            log.log.error("No vaild key!")
+            return
+        for i in range(FILE_AMOUNT):
+            FILE_PATH = str(i+1)+".txt"
+            ENC_PATH = "Enc"+str(i+1)+".bin"
+            with open(FILE_PATH, "r") as f:
+                wordlist = f.read().split(",")
+                enclist = []
+                log.log.debug("Plain list is %s", wordlist)
+                # newflag=True# 这个单词是否是文件的第一个
+
+                for word in wordlist:
+                    enctext = self.Enc(word)  # is a list
+                    log.log.info("Encrypt:%s->%s", word, str(enctext))
+                    enclist.append(enctext)
+
+                # Upload here
+                data = dict()
+                data['type'] = "upload"
+                data['content'] = enclist  # NO PACKED!
+                data['filename'] = str(i+1)
+                # data['flag']=newflag
+                log.log.debug("data is %s", data)
+                rcvdict = self.connection.send(data)
+                if rcvdict['status'] == 200:  # Success
+                    log.log.info("data upload success")
+                else:
+                    log.log.error("Upload Failed")
+                    f.close()
+                    # newflag=False#Set as false
+            log.log.info("Enc %d Ends", i+1)
+            # Send encrypt
+            #datas = pickle.dumps(enclist)
+
+    def query(self):
+
+        log.log.info("Make Sure the Key has been Recovered")
+        if not(self.pk and self.sk):
+            log.log.error("key not recovered yet")
+            return
+        # Generate trapdoor
+        w = input("Input word wanna search")
+        if len(w)!=5:
+            log.log.warning("Wrong word format")
+            return
+        sk = self.group.deserialize(self.sk)  # deserialize
+        log.log.debug("Deserialized sk is %s", sk)
+        td = self.Hash1(w)**sk
+        content = self.group.serialize(td)
+        # Send
+        data = dict()
+        data['type'] = 'query'
+        data['query'] = content
+        log.log.debug("data is %s", data)
+        rcvdict = self.connection.send(data)
+        if rcvdict['status']==200:  # Success
+            log.log.info("data upload success")
+            # TODO 解析回传报文
+            if rcvdict['result'] == 200:
+                log.log.info("Word hit,%s",rcvdict['filename'])
+            elif rcvdict['result']==404:
+                log.log.warning("Word not found,check if the word is incorrect or the key is not recovered correctly")                
+                        
+        else:
+            log.log.error("Upload Failed")
+
+    def Hash1(self, w):
+        # 先对关键词w进行md5哈希
+        hv = Hash1pre(str(w).encode('utf8')).hexdigest()
+        
+        # 再对md5值进行group.hash哈希，生成对应密文
+        # 完整的Hash1由md5和group.hash组成
+        hv = self.group.hash(hv, type=G1)
+        return hv
+
+
+Hash2 = hashlib.sha256
 
 if __name__ == "__main__":
 

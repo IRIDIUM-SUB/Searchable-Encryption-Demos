@@ -1,7 +1,7 @@
 '''
 Author: I-Hsien
 Date: 2021-01-27 21:55:57
-LastEditTime: 2021-02-03 10:59:20
+LastEditTime: 2021-05-04 10:32:23
 LastEditors: I-Hsien
 Description: Another Isolated Program, act as server.
 FilePath: \Searchable-Encryption-Demos\SWP Solution\Server.py
@@ -10,10 +10,14 @@ Comments: Also use Connection class and config.json
 import socket
 import json
 import time
+import hashlib
 import Log as log
 import threading
-CONFIG_FILE = "config.json"
+import pickle
+from charm.toolbox.pairinggroup import PairingGroup, ZR, G1, G2, GT, pair
 
+CONFIG_FILE = "config.json"
+FILE_AMOUNT=5
 
 def tcplink(sock, addr) -> None:
     '''
@@ -27,17 +31,16 @@ def tcplink(sock, addr) -> None:
 
     while True:#Main loop,事务处理应该在这里面。
         log.log.debug("TCP Loop...")
-        rcvdatabin = sock.recv(1024)
+        rcvdatabin = sock.recv(4096)
 
         time.sleep(1)
-        log.log.debug("Data Segment:%s", rcvdatabin.decode('utf-8'))
         if not rcvdatabin:
             log.log.warning("Connection Loop broken")
             break  # Stop receiving
-        rcvdata = rcvdatabin.decode('utf-8')
-        log.log.debug("received data:%s", rcvdata)
+        rcvdata = pickle.loads(rcvdatabin)#rcvdata is a plain dict
+        log.log.debug("received data:%s", str(rcvdata))
 
-        ServerTransactionInterface(sock, json.loads(rcvdata))  # 传入事务处理接口
+        ServerTransactionInterface(sock, rcvdata)  # 传入事务处理接口
     
     sock.close()#Close Connection
     log.log.warning('Connection from %s closed.', addr)
@@ -61,8 +64,8 @@ def ServerTransactionInterface(sock, data: dict) -> None:
     log.log.debug("Received request type:%s", data["type"])
 
     choices = {
-        "upload": "",
-        "query": "",
+        "upload": Upload,
+        "query": Query,
         "test": TestConnection
     }
     try:
@@ -77,7 +80,7 @@ def ServerTransactionInterface(sock, data: dict) -> None:
         log.log.info("Got Command %s", action)
         action(sock, data)
     else:
-        log.log.error("{0} is not a valid choice",format(choice))
+        log.log.error("%s is not a valid choice",choice)
         return
 
 
@@ -113,12 +116,65 @@ def TestConnection(sock, data) -> int:
     ResopnseMsg["result"] = result
 
     # Encode and send
-    ResopnseJson = json.dumps(ResopnseMsg)
-    sock.send(ResopnseJson.encode(encoding="utf-8"))
+    sock.send(pickle.dumps(ResopnseMsg))
     log.log.info("Response mseg sent,type:%s", data['type'])
     return
 
-
+def Upload(sock,data):
+    log.log.info("Start receiving enc")
+    enctext=data['content'] #is a non-PICKLED list
+    log.log.debug("enctext is %s",enctext)
+    filename="ServerEnc"+data['filename']+".bin"
+    
+    with open (filename,"wb")as f:
+        pickle.dump(enctext,f)
+        
+        f.close()
+    
+    log.log.info("File %s saved",filename)
+    ResponseMsg=dict()
+    ResponseMsg["status"]=200
+    sock.send(pickle.dumps(ResponseMsg))
+    log.log.info("Response msg sent,type:%s", data['type'])
+    return
+        
+def Query(sock,data):
+    log.log.info("Start query")
+    for i in range(FILE_AMOUNT):# for each file
+        filename="ServerEnc"+str(i+1)+".bin"
+        log.log.info("Searching %s",filename)
+        with open(filename,"rb") as f:
+            enclist=pickle.load(f)#a list of enctext
+            f.close()
+        for word in enclist:
+            log.log.info("Checking %s",str(word))
+            if Test(data['query'],word): #match
+                log.log.info("word hit,in %s",filename)
+                #Ready to send msg
+                data=dict()
+                data['type']='response'
+                data['status']=200
+                data['result']=200
+                data['filename']=filename
+                sock.send(pickle.dumps(data))
+                return
+    # Failed
+    log.log.warning("No word found")
+    data=dict()
+    data['type']='response'
+    data['status']=200
+    data['result']=404
+    data['filename']=None
+    sock.send(pickle.dumps(data))
+    return
+def Test(td, c, param_id='SS512'):
+    group = PairingGroup(param_id)
+    Hash2 = hashlib.sha256
+    c1 = group.deserialize(c[0])
+    c2 = c[1]
+    #print(c2)
+    td = group.deserialize(td)
+    return Hash2(group.serialize(pair(td, c1))).hexdigest() == c2
 if __name__ == "__main__":
     with open(CONFIG_FILE, "r")as f:
         NetConf = json.load(f)
