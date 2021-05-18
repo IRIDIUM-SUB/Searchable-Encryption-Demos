@@ -1,7 +1,7 @@
 '''
 Author: I-Hsien
 Date: 2021-01-28 20:02:50
-LastEditTime: 2021-05-04 11:25:43
+LastEditTime: 2021-05-18 11:48:07
 LastEditors: I-Hsien
 Description: Client Program
 FilePath: \Searchable-Encryption-Demos\SWP Solution\local.py
@@ -56,7 +56,7 @@ class Menu(object):
 
     def run(self):
         while True:  # Main Loop
-            os.system("cls")
+            os.system("clear")
             self.display_menu()
             try:
                 choice = input("Enter an option: ")
@@ -72,7 +72,7 @@ class Menu(object):
             else:
                 log.log.error("Invaild Choice")
                 print("{0} is not a valid choice".format(choice))
-            os.system("PAUSE")
+            os.system("read -p Press any key to continue")
 
     def quit(self):
         print("\nThank you for using this script!\n")
@@ -122,8 +122,8 @@ class ClientTransactionInterface(object):
 
     def gen_wordlist(self, FILES_AMOUNT=10, WORDS_PER_FILE=5, WORD_LEN=5) -> None:
         '''
-        生成若干个文件，每个文件包含若干个单词，单词不重复且随机
-        文件名为1,2,3,4,5
+        生成若干个文件，每个文件包含若干个单词，单词不重复且随机，配置见默认参数
+        文件名为1,2,3,4,5,...
         '''
         log.log.info("Starting Generating wordlist")
 
@@ -219,7 +219,7 @@ class ClientTransactionInterface(object):
 
         return [self.group.serialize(c1), Hash2(self.group.serialize(c2)).hexdigest()]
 
-    def encrypt(self, FILE_AMOUNT=5, param_id='SS512'):
+    def encrypt(self, FILE_AMOUNT=10, param_id='SS512'):
         if not self.sk or not self.pk:
             log.log.error("No vaild key!")
             return

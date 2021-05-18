@@ -1,7 +1,7 @@
 '''
 Author: I-Hsien
 Date: 2021-01-27 21:55:57
-LastEditTime: 2021-05-04 10:32:23
+LastEditTime: 2021-05-09 12:23:12
 LastEditors: I-Hsien
 Description: Another Isolated Program, act as server.
 FilePath: \Searchable-Encryption-Demos\SWP Solution\Server.py
@@ -17,7 +17,7 @@ import pickle
 from charm.toolbox.pairinggroup import PairingGroup, ZR, G1, G2, GT, pair
 
 CONFIG_FILE = "config.json"
-FILE_AMOUNT=5
+FILE_AMOUNT=10
 
 def tcplink(sock, addr) -> None:
     '''
