@@ -85,7 +85,7 @@ python3 local.py
 
 ## 原理
 
-![image-20210520101835096](README.assets/image-20210520101835096.png)
+见Reference 讲的比较详细
 
 ## 操作
 
